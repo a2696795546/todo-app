@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>待办时间小助手</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>✓</text></svg>">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<!-- 移动端顶栏 -->
+<header class="mobile-topbar">
+  <button class="icon-btn" id="menu-btn">☰</button>
+  <h2 id="mobile-title">待办事项</h2>
+</header>
+
+<!-- 侧边栏遮罩 -->
+<div class="sidebar-mask" id="sidebar-mask"></div>
+
+<!-- 侧边栏 -->
+<aside class="sidebar">
+  <div class="logo">
+    <span class="logo-icon">✓</span>
+    <span class="logo-text">待办</span>
+    <button class="icon-btn" id="dark-toggle" title="深色模式">🌙</button>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-title">智能清单</div>
+    <button class="nav-item active" data-view="today"><span class="dot" style="background:#ff6b6b"></span>今天<span class="badge" data-badge="today"></span></button>
+    <button class="nav-item" data-view="next7"><span class="dot" style="background:#ffab00"></span>最近 7 天<span class="badge" data-badge="next7"></span></button>
+    <button class="nav-item" data-view="all"><span class="dot" style="background:#4d8dff"></span>全部<span class="badge" data-badge="all"></span></button>
+    <button class="nav-item" data-view="done"><span class="dot" style="background:#9aa0a6"></span>已完成<span class="badge" data-badge="done"></span></button>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-title">我的清单 <button class="mini-btn" id="add-list-btn" title="新建清单">＋</button></div>
+    <div id="lists-container"></div>
+  </div>
+
+  <div class="nav-section">
+    <div class="nav-title">视图</div>
+    <button class="nav-item" id="view-list-btn"><span class="dot" style="background:#00b884"></span>📋 列表</button>
+    <button class="nav-item" id="view-kanban-btn"><span class="dot" style="background:#00b884"></span>📌 看板</button>
+    <button class="nav-item" id="view-calendar-btn"><span class="dot" style="background:#00b884"></span>📅 日历</button>
+    <button class="nav-item" id="view-stats-btn"><span class="dot" style="background:#00b884"></span>📊 统计</button>
+    <button class="nav-item" id="view-quad-btn"><span class="dot" style="background:#ff6b6b"></span>🔲 四象限</button>
+    <button class="nav-item" id="view-habit-btn"><span class="dot" style="background:#2faa6a"></span>🔥 习惯</button>
+    <button class="nav-item" id="view-settings-btn"><span class="dot" style="background:#9aa0a6"></span>⚙️ 设置</button>
+  </div>
+</aside>
+
+<!-- 主区 -->
+<main class="main">
+  <header class="topbar">
+    <h2 class="view-title" id="view-title">今天</h2>
+    <input type="text" id="search" placeholder="🔍 搜索 (按 /)">
+    <button class="btn-ghost" id="export-btn" title="导出 CSV">📤</button>
+    <button class="btn-primary" id="new-btn">＋ 新建</button>
+  </header>
+
+  <div class="filter-bar">
+    <select id="filter-priority">
+      <option value="">全部优先级</option>
+      <option value="3">🔴 高</option>
+      <option value="2">🟡 中</option>
+      <option value="1">🔵 低</option>
+      <option value="0">⚪ 无</option>
+    </select>
+    <select id="filter-list">
+      <option value="">全部清单</option>
+      <option value="inbox">📥 收件箱</option>
+      <option value="work">💼 工作</option>
+      <option value="personal">👤 个人</option>
+      <option value="study">📚 学习</option>
+      <option value="life">🏠 生活</option>
+    </select>
+    <span class="hint">N 新建 · / 搜索 · 空格完成 · J/K 上下 · E 编辑 · Ctrl+S 保存</span>
+  </div>
+
+  <!-- 列表视图 -->
+  <section id="list-view" class="content">
+    <div id="task-list" class="task-list"></div>
+    <div id="empty-state" class="empty" hidden>
+      <div class="empty-icon">🎉</div>
+      <p>这里空空如也，按 N 添加第一个任务</p>
+    </div>
+  </section>
+
+  <!-- 看板视图 -->
+  <section id="kanban-view" class="content" hidden>
+    <div class="kanban-cols">
+      <div class="kanban-col" data-status="today">
+        <h3>📅 今天 / 逾期</h3>
+        <div class="kanban-cards"></div>
+      </div>
+      <div class="kanban-col" data-status="upcoming">
+        <h3>📅 即将到来</h3>
+        <div class="kanban-cards"></div>
+      </div>
+      <div class="kanban-col" data-status="done">
+        <h3>✅ 已完成</h3>
+        <div class="kanban-cards"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 月历视图 -->
+  <section id="calendar-view" class="content" hidden>
+    <div class="cal-header">
+      <button class="btn-ghost" id="cal-prev">◀</button>
+      <h3 id="cal-title">2026 年 10 月</h3>
+      <button class="btn-ghost" id="cal-next">▶</button>
+    </div>
+    <div class="cal-grid" id="cal-grid"></div>
+    <div id="cal-day-panel" class="cal-day-panel">
+      <h4 id="cal-day-title">今天</h4>
+      <div id="cal-day-tasks"></div>
+    </div>
+  </section>
+
+  <!-- 统计视图 -->
+  <section id="stats-view" class="content" hidden>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-num" id="stat-total">0</div><div class="stat-label">总任务</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-done">0</div><div class="stat-label">已完成</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-rate">0%</div><div class="stat-label">完成率</div></div>
+      <div class="stat-card"><div class="stat-num" id="stat-undone">0</div><div class="stat-label">未完成</div></div>
+    </div>
+    <div class="chart-block"><h3>按清单分布</h3><div id="chart-list" class="bar-chart"></div></div>
+    <div class="chart-block"><h3>按优先级</h3><div id="chart-priority" class="bar-chart"></div></div>
+  </section>
+
+  <!-- 四象限视图 -->
+  <section id="quadrant-view" class="content" hidden>
+    <div class="quad-grid">
+      <div class="quad-cell urgent-important">
+        <h3><span class="quad-num" style="background:#ff6b6b">I</span> <span style="color:#ff6b6b">重要且紧急</span></h3>
+        <div class="quad-list" data-quad="ui"></div>
+      </div>
+      <div class="quad-cell important">
+        <h3><span class="quad-num" style="background:#ffab00">II</span> <span style="color:#ffab00">重要不紧急</span></h3>
+        <div class="quad-list" data-quad="i"></div>
+      </div>
+      <div class="quad-cell urgent">
+        <h3><span class="quad-num" style="background:#4d8dff">III</span> <span style="color:#4d8dff">不重要但紧急</span></h3>
+        <div class="quad-list" data-quad="u"></div>
+      </div>
+      <div class="quad-cell normal">
+        <h3><span class="quad-num" style="background:#2faa6a">IV</span> <span style="color:#2faa6a">不重要不紧急</span></h3>
+        <div class="quad-list" data-quad="n"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 习惯打卡 -->
+  <section id="habit-view" class="content" hidden>
+    <div class="habit-header">
+      <h3>🔥 习惯</h3>
+      <div class="habit-tabs">
+        <button class="habit-tab active" data-habit-tab="today">今日</button>
+        <button class="habit-tab" data-habit-tab="week">周</button>
+        <button class="habit-tab" data-habit-tab="month">月</button>
+        <button class="habit-tab" data-habit-tab="records">记录</button>
+      </div>
+      <button class="btn-primary" id="habit-add-btn">＋ 新习惯</button>
+    </div>
+    <div id="habit-today" class="habit-pane"></div>
+    <div id="habit-week" class="habit-pane" hidden></div>
+    <div id="habit-month" class="habit-pane" hidden></div>
+    <div id="habit-records" class="habit-pane" hidden></div>
+  </section>
+
+  <!-- 设置 -->
+  <section id="settings-view" class="content" hidden>
+    <div class="settings-block">
+      <h3>番茄钟</h3>
+      <div class="setting-row">
+        <label>默认时长（分钟）</label>
+        <input type="number" id="set-pomo-min" value="25" min="5" max="120">
+      </div>
+    </div>
+    <div class="settings-block">
+      <h3>数据</h3>
+      <div class="setting-row">
+        <button class="btn-danger" id="set-clear-done">清除所有已完成任务</button>
+      </div>
+      <div class="setting-row">
+        <button class="btn-ghost" onclick="window.location.href='/api/export.csv'">导出 CSV</button>
+      </div>
+    </div>
+    <div class="settings-block">
+      <h3>☁️ 坚果云同步（WebDAV）</h3>
+      <p class="hint" style="margin-bottom:8px">在 jianguoyun.com 注册后，用"第三方应用密码"登录</p>
+      <div class="setting-row"><label>服务器地址</label><input type="text" id="sync-url" placeholder="https://dav.jianguoyun.com/dav/" style="width:240px"></div>
+      <div class="setting-row"><label>用户名（邮箱）</label><input type="text" id="sync-user" style="width:240px"></div>
+      <div class="setting-row"><label>应用密码</label><input type="password" id="sync-pass" style="width:240px"></div>
+      <div class="setting-row">
+        <button class="btn-primary" id="sync-save">保存配置</button>
+        <button class="btn-ghost" id="sync-push">↑ 上传到坚果云</button>
+        <button class="btn-ghost" id="sync-pull">↓ 从坚果云下载</button>
+      </div>
+    </div>
+    <div class="settings-block">
+      <h3>关于</h3>
+      <p class="hint">待办助手 v2.0 · Flask + 原生 JS · 数据存于 exe 同目录</p>
+    </div>
+  </section>
+
+  <!-- 番茄钟条 -->
+  <footer class="pomo-bar">
+    <div class="pomo-info">
+      <span class="pomo-timer" id="pomo-timer">25:00</span>
+      <span class="pomo-hint" id="pomo-hint">选中一项任务开始专注</span>
+    </div>
+    <div class="pomo-actions">
+      <button class="btn-sm green" id="pomo-start">▶ 开始</button>
+      <button class="btn-sm orange" id="pomo-pause">⏸</button>
+      <button class="btn-ghost" id="pomo-reset">↺</button>
+    </div>
+  </footer>
+</main>
+
+<!-- 详情侧栏 -->
+<aside class="detail" id="detail-panel" hidden>
+  <div class="detail-head">
+    <div class="detail-actions-top">
+      <button class="icon-btn" id="d-pin" title="置顶">📌</button>
+      <button class="icon-btn" id="d-abandon" title="放弃（不做）">🚫</button>
+      <button class="icon-btn" id="d-duplicate" title="创建副本">⧉</button>
+    </div>
+    <input type="text" id="d-title" placeholder="任务标题">
+    <button class="icon-btn" id="d-close">✕</button>
+  </div>
+  <div class="detail-body">
+    <div class="field">
+      <label>优先级</label>
+      <select id="d-priority">
+        <option value="0">⚪ 无</option>
+        <option value="1">🔵 低</option>
+        <option value="2">🟡 中</option>
+        <option value="3">🔴 高</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>清单</label>
+      <select id="d-list">
+        <option value="inbox">📥 收件箱</option>
+        <option value="work">💼 工作</option>
+        <option value="personal">👤 个人</option>
+        <option value="study">📚 学习</option>
+        <option value="life">🏠 生活</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>截止日期</label>
+      <input type="date" id="d-due">
+      <input type="time" id="d-due_time">
+    </div>
+    <div class="field">
+      <label>预估分钟</label>
+      <input type="number" id="d-est" min="0">
+    </div>
+    <div class="field">
+      <label>重复</label>
+      <select id="d-repeat">
+        <option value="none">不重复</option>
+        <option value="daily">每天</option>
+        <option value="weekly">每周</option>
+        <option value="monthly">每月</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>标签（空格分隔）</label>
+      <input type="text" id="d-tags" placeholder="工作 紧急">
+    </div>
+    <div class="field">
+      <label>备注</label>
+      <textarea id="d-desc" rows="4" placeholder="备注…"></textarea>
+    </div>
+    <div class="field">
+      <label>子任务</label>
+      <div id="d-subtasks"></div>
+      <div class="sub-add-row">
+        <input type="text" id="d-sub-new" placeholder="添加子任务">
+        <button class="btn-sm" id="d-sub-add">＋</button>
+      </div>
+    </div>
+    <div class="detail-actions">
+      <button class="btn-danger" id="d-delete">🗑 删除</button>
+      <button class="btn-primary" id="d-save">保存</button>
+    </div>
+  </div>
+</aside>
+
+<!-- 新建对话框 -->
+<div class="modal" id="new-modal" hidden>
+  <div class="modal-box">
+    <h3>新建任务</h3>
+    <input type="text" id="n-title" placeholder="任务标题（支持 #标签）">
+    <div class="modal-row">
+      <select id="n-list">
+        <option value="inbox">📥 收件箱</option>
+        <option value="work">💼 工作</option>
+        <option value="personal">👤 个人</option>
+        <option value="study">📚 学习</option>
+        <option value="life">🏠 生活</option>
+      </select>
+      <select id="n-priority">
+        <option value="0">⚪ 无</option>
+        <option value="1">🔵 低</option>
+        <option value="2">🟡 中</option>
+        <option value="3">🔴 高</option>
+      </select>
+    </div>
+    <div class="modal-row">
+      <input type="date" id="n-due">
+      <input type="time" id="n-due_time">
+      <input type="number" id="n-est" placeholder="预估分" min="0">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="n-cancel">取消</button>
+      <button class="btn-ghost" id="n-save-new">保存并新建</button>
+      <button class="btn-primary" id="n-ok">添加</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast" hidden></div>
+
+<!-- 悬浮添加按钮 -->
+<button class="fab" id="fab-add" title="新建任务">＋</button>
+
+<!-- 移动端底部导航 -->
+<nav class="bottom-nav">
+  <button class="bn-item active" data-view="list"><span class="bn-icon">✓</span><span class="bn-label">任务</span></button>
+  <button class="bn-item" data-view="calendar"><span class="bn-icon">📅</span><span class="bn-label">日历</span></button>
+  <button class="bn-item" data-view="quadrant"><span class="bn-icon">⊞</span><span class="bn-label">四象限</span></button>
+  <button class="bn-item" data-view="habit"><span class="bn-icon">📍</span><span class="bn-label">习惯</span></button>
+  <button class="bn-item" data-view="settings"><span class="bn-icon">⚙️</span><span class="bn-label">设置</span></button>
+</nav>
+<script src="/static/app.js"></script>
+</body>
+</html>
